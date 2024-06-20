@@ -11,6 +11,7 @@ require (
 	github.com/blagojts/viper v1.6.3-0.20200313094124-068f44cf5e69
 	github.com/globalsign/mgo v0.0.0-20181015135952-eeefdecb41b8
 	github.com/go-ole/go-ole v1.2.4 // indirect
+	github.com/go-sql-driver/mysql v1.5.0
 	github.com/gocql/gocql v0.0.0-20190810123941-df4b9cc33030
 	github.com/golang/protobuf v1.4.2
 	github.com/golang/snappy v0.0.1
