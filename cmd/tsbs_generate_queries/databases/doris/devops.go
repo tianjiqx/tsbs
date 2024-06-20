@@ -91,8 +91,6 @@ func (d *Devops) MaxAllCPU(qi query.Query, nHosts int, duration time.Duration) {
 	selectClauses := d.getSelectClausesAggMetrics("max", metrics)
 
 	sql := fmt.Sprintf(`
-        SELECT
-            DATE_FORMAT(created_at, '%Y-%m-%d %H:00:00') AS hour,
             %s
         FROM cpu
         WHERE %s AND (created_at >= '%s') AND (created_at < '%s')
@@ -103,6 +101,9 @@ func (d *Devops) MaxAllCPU(qi query.Query, nHosts int, duration time.Duration) {
 		d.getHostWhereString(nHosts),
 		interval.Start().Format(clickhouseTimeStringFormat),
 		interval.End().Format(clickhouseTimeStringFormat))
+
+	sql = `SELECT
+                       DATE_FORMAT(created_at, '%Y-%m-%d %H:00:00') AS hour,`  + sql
 
 	humanLabel := devops.GetMaxAllLabel("ClickHouse", nHosts)
 	humanDesc := fmt.Sprintf("%s: %s", humanLabel, interval.StartString())
@@ -137,18 +138,22 @@ func (d *Devops) GroupByTimeAndPrimaryTag(qi query.Query, numMetrics int) {
 	hostnameField := "hostname"
 	joinClause := ""
 	if d.UseTags {
-		joinClause = "ANY INNER JOIN tags USING (id)"
+		joinClause = "INNER JOIN tags on cpu_avg.id = tags.id"
 	}
 
-	sql := fmt.Sprintf(`
-        SELECT
-            hour,
-            %s,
-            %s
-        FROM
-        (
-            SELECT
-                DATE_FORMAT(created_at, '%Y-%m-%d %H:00:00') AS hour,
+    sql := fmt.Sprintf(`
+   SELECT
+               hour,
+               %s,
+               %s
+           FROM
+           (
+               SELECT
+    `, 		hostnameField,                                       // main SELECT %s,
+       		strings.Join(meanClauses, ", "),                     // main SELECT %s
+       		)
+    sql = sql + ` DATE_FORMAT(created_at, '%Y-%m-%d %H:00:00') AS hour, `
+	sql = sql + fmt.Sprintf(`
                 tags_id AS id,
                 %s
             FROM cpu
@@ -162,8 +167,6 @@ func (d *Devops) GroupByTimeAndPrimaryTag(qi query.Query, numMetrics int) {
             hour ASC,
             %s
         `,
-		hostnameField,                                       // main SELECT %s,
-		strings.Join(meanClauses, ", "),                     // main SELECT %s
 		strings.Join(selectClauses, ", "),                   // cpu_avg SELECT %s
 		interval.Start().Format(clickhouseTimeStringFormat), // cpu_avg time >= '%s'
 		interval.End().Format(clickhouseTimeStringFormat),   // cpu_avg time < '%s'
@@ -230,7 +233,7 @@ func (d *Devops) HighCPUForHosts(qi query.Query, nHosts int) {
 	sql := fmt.Sprintf(`
         SELECT *
         FROM cpu
-        PREWHERE (usage_user > 90.0) AND (created_at >= '%s') AND (created_at <  '%s') %s
+        WHERE (usage_user > 90.0) AND (created_at >= '%s') AND (created_at <  '%s') %s
         `,
 		interval.Start().Format(clickhouseTimeStringFormat),
 		interval.End().Format(clickhouseTimeStringFormat),
@@ -253,18 +256,16 @@ func (d *Devops) LastPointPerHost(qi query.Query) {
             SELECT *
             FROM
             (
-                SELECT *
+                SELECT cpu.*
                 FROM cpu
-                WHERE (tags_id, created_at) IN
-                (
-                    SELECT
-                        tags_id,
-                        max(created_at)
+                INNER JOIN (
+                    SELECT tags_id, MAX(created_at) AS max_created_at
                     FROM cpu
                     GROUP BY tags_id
-                )
+                ) latest_records
+                ON cpu.tags_id = latest_records.tags_id AND cpu.created_at = latest_records.max_created_at
             ) AS c
-            ANY INNER JOIN tags AS t ON c.tags_id = t.id
+            INNER JOIN tags AS t ON c.tags_id = t.id
             ORDER BY
                 t.hostname ASC,
                 c.time DESC
