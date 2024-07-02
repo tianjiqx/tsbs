@@ -34,7 +34,7 @@ func (d *Devops) getHostWhereWithHostnames(hostnames []string) string {
 		for _, s := range hostnames {
 			hostnameSelectionClauses = append(hostnameSelectionClauses, fmt.Sprintf("'%s'", s))
 		}
-		return fmt.Sprintf("tags['hostname'] IN (%s))", strings.Join(hostnameSelectionClauses, ","))
+		return fmt.Sprintf("tags_id IN (SELECT id FROM tags WHERE hostname IN (%s))", strings.Join(hostnameSelectionClauses, ","))
 	}
 
 	// Here we DO NOT use tags as a separate table
@@ -44,7 +44,7 @@ func (d *Devops) getHostWhereWithHostnames(hostnames []string) string {
 	// All tags are included into one table
 	// Need to prepare WHERE (hostname = 'host1' OR hostname = 'host2') clause
 	for _, s := range hostnames {
-		hostnameSelectionClauses = append(hostnameSelectionClauses, fmt.Sprintf("tags['hostname'] = '%s'", s))
+		hostnameSelectionClauses = append(hostnameSelectionClauses, fmt.Sprintf("hostname = '%s'", s))
 	}
 	// (host=h1 OR host=h2)
 	return "(" + strings.Join(hostnameSelectionClauses, " OR ") + ")"
@@ -138,7 +138,7 @@ func (d *Devops) GroupByTimeAndPrimaryTag(qi query.Query, numMetrics int) {
 	hostnameField := "hostname"
 	joinClause := ""
 	if d.UseTags {
-		//joinClause = "INNER JOIN tags on cpu_avg.id = tags.id"
+		joinClause = "INNER JOIN tags on cpu_avg.id = tags.id"
 	}
 
     sql := fmt.Sprintf(`
@@ -155,14 +155,12 @@ func (d *Devops) GroupByTimeAndPrimaryTag(qi query.Query, numMetrics int) {
     sql = sql + ` DATE_FORMAT(created_at, '%Y-%m-%d %H:00:00') AS hour, `
 	sql = sql + fmt.Sprintf(`
                 tags_id AS id,
-                cast(tags['hostname'] as text) as hostname
                 %s
             FROM cpu
             WHERE (created_at >= '%s') AND (created_at < '%s')
             GROUP BY
                 hour,
-                id,
-                hostname
+                id
         ) AS cpu_avg
         %s
         ORDER BY
@@ -258,7 +256,7 @@ func (d *Devops) LastPointPerHost(qi query.Query) {
             SELECT *
             FROM
             (
-                SELECT cpu.*, cast(cpu.tags['hostname'] as text) as hostname
+                SELECT cpu.*
                 FROM cpu
                 INNER JOIN (
                     SELECT tags_id, MAX(created_at) AS max_created_at
@@ -267,8 +265,9 @@ func (d *Devops) LastPointPerHost(qi query.Query) {
                 ) latest_records
                 ON cpu.tags_id = latest_records.tags_id AND cpu.created_at = latest_records.max_created_at
             ) AS c
+            INNER JOIN tags AS t ON c.tags_id = t.id
             ORDER BY
-                c.hostname ASC,
+                t.hostname ASC,
                 c.time DESC
             `)
 	} else {
