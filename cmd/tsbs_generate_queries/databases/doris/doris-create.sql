@@ -1,3 +1,6 @@
+
+-- 合并tags字段
+
 CREATE TABLE cpu
 (
     `tags_id` INT,

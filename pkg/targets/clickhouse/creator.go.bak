@@ -132,13 +132,13 @@ func createMetricsTable(conf *ClickhouseConfig, db *sqlx.DB, tableName string, f
 			// Skip nameless columns
 			continue
 		}
-		columnsWithType = append(columnsWithType, fmt.Sprintf("%s Nullable(Float64) CODEC(Gorilla)", column))
+		columnsWithType = append(columnsWithType, fmt.Sprintf("%s Nullable(Float64)", column))
 	}
 
 	sql := fmt.Sprintf(`
 			CREATE TABLE %s (
-				created_date    Date     DEFAULT today() CODEC(DoubleDelta),
-				created_at      DateTime DEFAULT now() CODEC(DoubleDelta),
+				created_date    Date     DEFAULT today(),
+				created_at      DateTime DEFAULT now(),
 				time            String,
 				tags_id         UInt32,
 				%s,
