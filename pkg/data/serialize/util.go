@@ -17,9 +17,9 @@ func FastFormatAppend(v interface{}, buf []byte) []byte {
 		// From Golang source on genericFtoa (called by AppendFloat): 'Negative precision means "only as much as needed to be exact."'
 		// Using this instead of an exact number for precision ensures we preserve the precision passed in to the function, allowing us
 		// to use different precision for different use cases.
-		return strconv.AppendFloat(buf, v.(float64), 'f', -1, 64)
+		return strconv.AppendFloat(buf, v.(float64), 'f', 2, 64)
 	case float32:
-		return strconv.AppendFloat(buf, float64(v.(float32)), 'f', -1, 32)
+		return strconv.AppendFloat(buf, float64(v.(float32)), 'f', 2, 32)
 	case bool:
 		return strconv.AppendBool(buf, v.(bool))
 	case []byte:
